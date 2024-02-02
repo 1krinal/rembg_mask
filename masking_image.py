@@ -2,8 +2,25 @@ import rembg
 import cv2
 import numpy as np
 import urllib.request
-from PIL import Image
+import os
+
  
+def create_folders():
+    # Specify the paths for 'original' and 'masked' folders
+    original_folder = 'original'
+    masked_folder = 'masked'
+
+    # Create 'original' folder if it doesn't exist
+    if not os.path.exists(original_folder):
+        os.makedirs(original_folder)
+        print(f"Created '{original_folder}' folder.")
+
+    # Create 'masked' folder if it doesn't exist
+    if not os.path.exists(masked_folder):
+        os.makedirs(masked_folder)
+        print(f"Created '{masked_folder}' folder.")
+
+create_folders()
 
 def load_image_from_url(url):
     resp = urllib.request.urlopen(url)
@@ -35,7 +52,7 @@ def create_mask(input_path, mask_path):
 
 # Example usage
 input_url = "https://images.all-free-download.com/images/graphiclarge/swan_beauty_nature_264533.jpg"
-# urllib.request.urlretrieve(input_url, 'original/downloaded_image.png')
+urllib.request.urlretrieve(input_url, 'original/downloaded_image.png')
 cv2.imread('original/downloaded_image.png', 1)
 
 output_image_path = "original/output_image_without_background1.png"
