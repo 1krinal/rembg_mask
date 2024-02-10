@@ -1,92 +1,98 @@
-from fastapi import FastAPI,HTTPException,UploadFile,Request
+from fastapi import FastAPI,HTTPException,UploadFile,File
 from fastapi.responses import FileResponse
 import cv2
-import os
-import base64
 import uuid
+import io
+import os
 import aiohttp
-import urllib.request
 import numpy as np
 import rembg
 import pathlib as Path
  
-IMAGEDIR = "images/"
+
 ORIGINAL ="original/"
 MASK ="masked/"
- 
 app = FastAPI()
- 
+
+
 async def download_image_and_process(image_url: str):
     # Fetch the file contents from the URL
-    async with aiohttp.ClientSession() as session:
-        async with session.get(image_url) as response:
-            contents = await response.read()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as response:
+                    contents = await response.read()
 
     # Generate a unique filename
-    filename = f"{uuid.uuid4()}.jpg"
+            filename = f"{uuid.uuid4()}.jpg"
 
     # Save the original file
-    with open(f"{ORIGINAL}{filename}", "wb") as f:
-        f.write(contents)
+            with open(f"{ORIGINAL}{filename}", "wb") as f:
+                 f.write(contents)
 
     # Process the image using rembg
-    output_data = rembg.remove(contents)  # Assuming rembg.remove() takes image bytes as input
+            output_data = rembg.remove(contents)  
 
     # Save the processed image
-    with open(f"{MASK}mask_{filename}", "wb") as output_file:
-        output_file.write(output_data)
+            with open(f"{MASK}mask_{filename}", "wb") as output_file:
+                 output_file.write(output_data)
 
-    mask_image = cv2.imdecode(np.frombuffer(output_data, np.uint8), cv2.IMREAD_UNCHANGED)
-    mask_image[mask_image > 0] = 255  # Set non-zero pixels to 255 (white)
-    mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2GRAY)
+            mask_image = cv2.imdecode(np.frombuffer(output_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            mask_image[mask_image > 0] = 255  # Set non-zero pixels to 255 (white)
+            mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2GRAY)
 
     # Save the black and white mask
-    mask_filename = f"mask_BW_{filename}"
-    cv2.imwrite(f"{MASK}{mask_filename}", mask_image)
+            mask_filename = f"mask_BW_{filename}"
+            cv2.imwrite(f"{MASK}{mask_filename}", mask_image)
 
-    return {"filename": filename, "mask_filename": mask_filename,"output_file_path": f"mask_{filename}"}
+            return {"filename": filename, "mask_filename": mask_filename,"output_file_path": f"mask_{filename}"}
 
-    
-@app.post("/upload/")
-async def create_upload_file(image_url: str):
+
+@app.post("/image_url/")
+
+async def remove_background(image_url: str):
+     
     filename = await download_image_and_process(image_url)
-    return {"filename": filename}
+    return {"image": filename}
 
+@app.post("/merge_images/")
+async def merge_images(original_filename: str, file: UploadFile = File(...)):
+   
+    original_path = os.path.join(ORIGINAL, original_filename)
+    original_image = cv2.imread(original_path)
+
+    # Load the original image
+    filename = file.filename
+    mask_path = os.path.join(MASK, filename)
+    mask_image = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+    # Merge the two images
+    merged_image = cv2.bitwise_and(original_image, original_image, mask=mask_image)
+
+    # Save the merged image
+    merged_filename = f"merged_{filename}"
+    merged_path = os.path.join(ORIGINAL, merged_filename)
+    cv2.imwrite(merged_path, merged_image)
+
+    return {"original Image":original_path,"mask image":mask_path,"merged_filename": merged_filename}
 
 @app.get("/show/")
-async def read_random_file():
+async def read_random_file(original,mask):
  
     # get random file from the image directory
-    files = os.listdir(MASK)
- 
-    path = f"{IMAGEDIR}{files}"
+    file = os.listdir(ORIGINAL)
+   
+    filename = file.filename
+
+    path = f"{ORIGINAL}{filename}"
      
     return FileResponse(path)
-
+@app.get("/show/")
+async def remove_background():
     
-# @app.post("/upload/")
-# async def create_upload_file(file_url: str):
-
-#     # Fetch the file contents from the URL
-#     async with aiohttp.ClientSession() as session:
-#         async with session.get(file_url) as response:
-#             contents = await response.read()
-
-#     # Generate a unique filename
-#     filename = f"{uuid.uuid4()}.jpg"
-
-#     # Save the file
-#     with open(f"{IMAGEDIR}{filename}", "wb") as f:
-#         f.write(contents)
-    
-#     output_data = rembg.remove(file_url)
-
-#     with open(f"{ORIGINAL}{filename}", "wb") as output_file:
-#         output_file.write(output_data)
+    filename = await download_image_and_process(image_url=f"{ORIGINAL/filename}")
+    return {"image": filename}
 
     
 
-#     return {"filename": filename}
 
  
 # @app.get("/show/")
