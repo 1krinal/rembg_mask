@@ -66,12 +66,15 @@ async def merge_images(original_filename: str, file: UploadFile = File(...)):
     filename = file.filename
     mask_path = os.path.join(MASK, filename)
     mask_image = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    merged_image = cv2.bitwise_and(original_image, original_image, mask=mask_image)
+    original_image_rgb=cv2.cvtColor(original_image,cv2.COLOR_RGB2RGBA )
+    merged_image = cv2.bitwise_and(original_image_rgb, original_image_rgb, mask=mask_image)
 
+    # merged_image = cv2.bitwise_and(original_image, original_image, mask=mask_image)
+    
     # Save the merged image
     merged_filename = f"merged_{filename}"
     merged_path = os.path.join(ORIGINAL, merged_filename)
-    cv2.imwrite(merged_path, merged_image)
+    cv2.imwrite(merged_path,merged_image)
 
     return {"original Image":original_path,"mask image":mask_path,"merged_filename": merged_filename}
 
