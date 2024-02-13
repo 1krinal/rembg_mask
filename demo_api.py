@@ -1,4 +1,4 @@
-from fastapi import FastAPI,UploadFile,File,HTTPException
+from fastapi import FastAPI,UploadFile,File,HTTPException,Query
 from fastapi.responses import FileResponse
 import cv2
 import uuid
@@ -18,7 +18,7 @@ async def download_image_and_process(image_url: str):
         async with session.get(image_url) as response:
             contents = await response.read()
 
-    filename = f"{uuid.uuid4()}.jpg"
+    filename = f"{uuid.uuid4()}.png"
     with open(f"{ORIGINAL}{filename}", "wb") as f:
         f.write(contents)
     output_data = rembg.remove(contents)  
@@ -33,22 +33,24 @@ async def download_image_and_process(image_url: str):
     cv2.imwrite(f"{MASK}{mask_filename}", mask_image)
             
     return {"filename": filename, "mask_filename": mask_filename,"output_file_path": f"mask_{filename}"}
-
-def get_image_path(filename: str, mask: bool = False) -> Path:
-    if  mask==True:
-        return Path(MASK)/ f"mask_{filename}"
-    else:
-        return Path(MASK)/f"mask_BW_{filename}"
-    
 @app.post("/image_url/")
 async def remove_background(image_url: str):
     filename = await download_image_and_process(image_url)
     return {"image": filename}
 
-
+def get_image_path(filename: str,image_type:str="Mask")  -> Path:
+    
+    if image_type=="Mask":
+        return Path(MASK)/ f"mask_{filename}"
+    elif image_type =="Mask B&W":
+        return Path(MASK)/f"mask_bw_{filename}"
+    else:
+        raise ValueError(f"Invalid image type:{image_type}")
+    
 @app.get("/image/{filename}")
-async def get_object_detect_image(filename: str, mask: bool = False): 
-    image_path = get_image_path(filename, mask)
+async def get_object_detect_image(filename: str,image_type:str=Query(...,description="Type of image to return",defaut="Mask",enum=["Mask","Mask B&W"])): 
+    
+    image_path = get_image_path(filename,image_type)
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(image_path)
@@ -73,16 +75,19 @@ async def merge_images(original_filename: str, file: UploadFile = File(...)):
 
     return {"original Image":original_path,"mask image":mask_path,"merged_filename": merged_filename}
 
-def get_mereg_image(filename: str,mask:bool=False ) -> Path:
-    if  mask:
+def get_mereg_image(filename: str,image_Type:str="Mereg Image" ) -> Path:
+    if  image_Type=="Mereg Image":
         return Path(ORIGINAL)/f"merged_mask_BW_{filename}"
-    else:
+    elif image_Type=="Mask B&W":
         return Path(MASK)/f"mask_BW_{filename}"
+    else:
+        raise ValueError(f"Invalid image type:{image_Type}")
 
-@app.get("/merge_image/{filename}")
-async def get_image(filename: str,mask:bool=False ):
+@app.get("/mereg_image/{filename}")
+async def get_image(filename: str,image_Type:str=Query(...,description="Type of image to return",defaut="Mereg Image",enum=["Mereg Image","Mask B&W"])): 
     
-    path = get_mereg_image(filename,mask)
-    if not path.exists():
+    image_path = get_mereg_image(filename,image_Type)
+    if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(path)
+    return FileResponse(image_path)
+
