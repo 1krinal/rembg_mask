@@ -5,6 +5,7 @@ import uuid
 import os
 import aiohttp
 import numpy as np
+from PIL import Image
 import rembg
 from pathlib import Path
 
@@ -26,11 +27,12 @@ async def download_image_and_process(image_url: str):
     with open(f"{MASK}mask_{filename}", "wb") as output_file:
         output_file.write(output_data)
 
-    mask_image = cv2.imdecode(np.frombuffer(output_data, np.uint8), cv2.IMREAD_UNCHANGED)
-    mask_image[mask_image > 0] = 255  # Set non-zero pixels to 255 (white)
+    mask_image=cv2.imread(f'{MASK}mask_{filename}',cv2.IMREAD_UNCHANGED)
+    _,mask=cv2.threshold(mask_image[:,:,3],10,255,cv2.THRESH_BINARY)
     mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2GRAY)
+   
     mask_filename = f"mask_BW_{filename}"
-    cv2.imwrite(f"{MASK}{mask_filename}", mask_image)
+    cv2.imwrite(f"{MASK}{mask_filename}",mask)
             
     return {"filename": filename, "mask_filename": mask_filename,"output_file_path": f"mask_{filename}"}
 @app.post("/image_url/")
@@ -57,6 +59,7 @@ async def get_object_detect_image(filename: str,image_type:str=Query(...,descrip
     
     
 @app.post("/merge_images/")
+
 async def merge_images(original_filename: str, file: UploadFile = File(...)):
    
     original_path = os.path.join(ORIGINAL, original_filename)
@@ -78,16 +81,16 @@ async def merge_images(original_filename: str, file: UploadFile = File(...)):
 
     return {"original Image":original_path,"mask image":mask_path,"merged_filename": merged_filename}
 
-def get_mereg_image(filename: str,image_Type:str="Mereg Image" ) -> Path:
-    if  image_Type=="Mereg Image":
+def get_mereg_image(filename: str,image_Type:str="Merge Image" ) -> Path:
+    if  image_Type=="Merge Image":
         return Path(ORIGINAL)/f"merged_mask_BW_{filename}"
     elif image_Type=="Mask B&W":
         return Path(MASK)/f"mask_BW_{filename}"
     else:
         raise ValueError(f"Invalid image type:{image_Type}")
 
-@app.get("/mereg_image/{filename}")
-async def get_image(filename: str,image_Type:str=Query(...,description="Type of image to return",defaut="Mereg Image",enum=["Mereg Image","Mask B&W"])): 
+@app.get("/merge_image/{filename}")
+async def get_image(filename: str,image_Type:str=Query(...,description="Type of image to return",defaut="Merge Image",enum=["Merge Image","Mask B&W"])): 
     
     image_path = get_mereg_image(filename,image_Type)
     if not image_path.exists():
